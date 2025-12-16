@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0066ff">
+  <link rel="manifest" href="https://raw.githubusercontent.com/prsperling/plus-minus-tracker/main/manifest.json">
+  <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/prsperling/plus-minus-tracker/main/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="https://raw.githubusercontent.com/prsperling/plus-minus-tracker/main/icon-512.png">
+  <title>Plus Minus</title>
+  <style>
+    body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#f5f5f5; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+    header { background:#0066ff; color:white; padding:20px; text-align:center; font-size:52px; font-weight:800; box-shadow:0 6px 16px rgba(0,0,0,0.25); position:relative; flex-shrink:0; }
+    .menu-btn { position:absolute; left:20px; top:50%; transform:translateY(-50%); font-size:56px; background:none; border:none; color:white; cursor:pointer; width:70px; height:70px; display:flex; align-items:center; justify-content:center; }
+    .game-id { position:absolute; right:24px; top:50%; transform:translateY(-50%); font-size:36px; font-weight:700; background:#0044cc; padding:8px 24px; border-radius:16px; }
+
+    .menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:999; }
+    .menu-panel { background:white; width:80%; max-width:420px; border-radius:24px; padding:40px 20px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.4); }
+    .menu-item { font-size:36px; font-weight:700; padding:24px; margin:15px 0; background:#0066ff; color:white; border-radius:20px; cursor:pointer; }
+
+    main { flex:1; overflow-y:auto; padding:30px; display:flex; flex-direction:column; align-items:center; gap:30px; max-height: calc(100vh - 160px); }
+
+    .goal-type { display:flex; gap:30px; width:100%; max-width:700px; justify-content:center; }
+    .goal-btn { flex:1; height:110px; font-size:38px; font-weight:800; border-radius:20px; cursor:pointer; transition:all 0.25s; box-shadow:0 10px 30px rgba(0,0,0,0.2); }
+    .goal-btn.gf { background:white; color:#0d8f3c; border:6px solid #0d8f3c; }
+    .goal-btn.ga { background:white; color:#d32f2f; border:6px solid #d32f2f; }
+    .goal-btn.selected.gf { background:#0d8f3c; color:white; }
+    .goal-btn.selected.ga { background:#d32f2f; color:white; }
+
+    .section { width:100%; max-width:700px; }
+    .section-title { font-size:36px; font-weight:800; color:#222; text-align:center; margin-bottom:20px; padding:14px; background:#e8f0ff; border-radius:16px; }
+
+    .select-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; }
+    .select-row.defence { grid-template-columns:1fr 1fr; }
+    .select-row.extra { grid-template-columns:1fr; justify-content:center; }
+
+    select, #time-input {
+      width:100%; height:115px; font-size:56px; font-weight:bold; text-align:center;
+      border:4px solid #ccc; border-radius:20px; background:white;
+      box-shadow:0 6px 20px rgba(0,0,0,0.15); -webkit-appearance:none;
+      padding:0; box-sizing:border-box; outline:none;
+    }
+    #time-input { font-family:monospace; letter-spacing:3px; }
+
+    .action-buttons { display:flex; gap:30px; width:100%; max-width:700px; justify-content:center; margin:20px 0; }
+    .toggle-btn { padding:18px 32px; font-size:28px; font-weight:700; color:#0066ff; background:#f5f5f5; border:none; border-radius:16px; cursor:pointer; min-width:240px; text-align:center; }
+    .toggle-btn.active { background:#0066ff; color:white; }
+
+    #flag-select { display:none; width:100%; max-width:700px; height:115px; font-size:56px; margin:20px 0; }
+
+    #response { text-align:center; font-weight:800; font-size:32px; color:#d32f2f; margin:8px 0; opacity:0; transition:opacity 0.3s; }
+    #response:not(:empty) { opacity:1; }
+
+    .submit-btn { width:100%; max-width:700px; height:90px; font-size:36px; font-weight:800; color:white; background:#0066ff; border:none; border-radius:20px; box-shadow:0 12px 35px rgba(0,102,255,0.5); cursor:pointer; }
+
+    .goal-log { width:100%; max-width:700px; background:white; border-radius:20px; padding:24px; margin:30px 0; box-shadow:0 6px 20px rgba(0,0,0,0.12); font-family:monospace; font-size:32px; line-height:1.7; }
+    .goal-entry { display:flex; justify-content:space-between; padding:8px 0; border-bottom:2px solid #eee; }
+    .goal-entry:last-child { border-bottom:none; }
+    .gf { color:#0d8f3c; font-weight:900; }
+    .ga { color:#d32f2f; font-weight:900; }
+    .goal-entry span:last-child { font-weight:900; }
+
+    #stats-page table { width:100%; max-width:700px; border-collapse:collapse; background:white; border-radius:20px; overflow:hidden; box-shadow:0 6px 20px rgba(0,0,0,0.15); }
+    #stats-page th { background:#0066ff; color:white; padding:24px; font-size:36px; font-weight:800; cursor:pointer; user-select:none; }
+    #stats-page th:hover { background:#0055cc; }
+    #stats-page th.asc::after { content: ' ▲'; color: #0d8f3c; font-weight: bold; }
+    #stats-page th.desc::after { content: ' ▼'; color: #d32f2f; font-weight: bold; }
+    #stats-page td { padding:20px; text-align:center; font-size:48px; font-weight:bold; border-bottom:2px solid #eee; }
+    #stats-page tr:last-child td { border-bottom:none; }
+    #stats-page .positive { color:#0d8f3c; }
+    #stats-page .negative { color:#d32f2f; }
+    #stats-page .zero { color:#666; }
+    #stats-page .loading { text-align:center; font-size:40px; color:#666; margin-top:100px; }
+
+    .page { display:none; }
+    .page.active { display:block; }
+  </style>
+</head>
+<body>
+
+  <!-- Main Scoring Page -->
+  <div id="main-page" class="page active">
+    <header>
+      <button class="menu-btn" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      Plus Minus
+      <div class="game-id" id="main-game-id">Game 1</div>
+    </header>
+    <main>
+      <div class="goal-type">
+        <button class="goal-btn gf" id="goal-for" onclick="selectGoalType('GF')">Goal For</button>
+        <button class="goal-btn ga" id="goal-against" onclick="selectGoalType('GA')">Goal Against</button>
+      </div>
+
+      <div class="section"><div class="section-title">Defencemen</div><div class="select-row defence" id="defence"></div></div>
+      <div class="section"><div class="section-title">Forwards</div><div class="select-row" id="forwards"></div></div>
+      <div class="section" id="extra-section" style="display:none;"><div class="section-title">Extra Skater</div><div class="select-row extra" id="extra"></div></div>
+
+      <div style="width:100%; max-width:700px; margin:15px 0;">
+        <div class="action-buttons">
+          <button class="toggle-btn" id="extra-toggle" onclick="toggleExtra()">Add Extra Skater</button>
+          <button class="toggle-btn" id="flag-toggle" onclick="toggleFlag()">Add a Flag</button>
+        </div>
+
+        <select id="flag-select" onchange="selectFlag(this.value)" style="display:none; margin:15px 0;">
+          <option value="">--</option>
+          <option value="Iggy PP">Iggy Power Play</option>
+          <option value="Iggy SH">Iggy Short Handed</option>
+          <option value="EN">Empty Net</option>
+          <option value="SO">Shoot Out</option>
+          <option value="Review">Video Review</option>
+        </select>
+
+        <div style="display:flex; gap:24px; margin-top:15px;">
+          <div style="flex:1;">
+            <div class="section-title">Period</div>
+            <select id="period-select">
+              <option value="">--</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="OT">OT</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <div class="section-title">Time</div>
+            <input type="tel" id="time-input" inputmode="numeric" pattern="[0-9:]*" placeholder="--:--" maxlength="5"
+                   style="width:100%; height:115px; font-size:56px; font-weight:bold; text-align:center;
+                          border:4px solid #ccc; border-radius:20px; background:white;
+                          box-shadow:0 6px 20px rgba(0,0,0,0.15); font-family:monospace; letter-spacing:3px;
+                          padding:0; line-height:1; box-sizing:border-box; outline:none;"
+                   oninput="this.value = this.value.replace(/[^0-9:]/g,'').replace(/^(\d\d)(\d)$/, '$1:$2').slice(0,5)">
+          </div>
+        </div>
+      </div>
+
+      <div id="response"></div>
+      <button class="submit-btn" onclick="submitForm()">Submit Lineup</button>
+      <div class="goal-log" id="goal-log"><em>Loading game...</em></div>
+    </main>
+  </div>
+
+  <!-- Live Stats Page -->
+  <div id="stats-page" class="page">
+    <header>
+      <button class="menu-btn" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      Live +/-
+      <div class="game-id" id="stats-game-selector" style="cursor:pointer; user-select:none;">
+        Game <span id="stats-game-id">1</span> ▼
+      </div>
+    </header>
+
+    <div id="stats-view-menu" style="position:absolute; right:20px; top:90px; background:white; border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,0.3); padding:10px 0; min-width:160px; z-index:1000; display:none;">
+      <div class="menu-item" style="font-size:32px; padding:16px 24px;" onclick="setStatsView('current')">Current Game</div>
+      <div class="menu-item" style="font-size:32px; padding:16px 24px;" onclick="setStatsView('last5')">Last 5</div>
+      <div class="menu-item" style="font-size:32px; padding:16px 24px;" onclick="setStatsView('all')">ALL</div>
+    </div>
+
+    <main>
+      <div class="loading" id="stats-loading">Loading stats...</div>
+      <table id="stats-table" style="display:none;">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)" id="th-player">#</th>
+            <th onclick="sortTable(1)" id="th-dname">Name</th>
+            <th onclick="sortTable(2)" id="th-pm">+/-</th>
+            <th onclick="sortTable(3)" id="th-ratio">GA/GF</th>
+          </tr>
+        </thead>
+        <tbody id="stats-body"></tbody>
+      </table>
+    </main>
+  </div>
+
+  <div class="menu-overlay" id="menu-overlay" onclick="toggleMenu()">
+    <div class="menu-panel" id="menu-panel" onclick="event.stopPropagation()"></div>
+  </div>
+
+<script>
+  let currentPage = 'main';
+  let currentSelections = new Array(6).fill(null);
+  let extraVisible = false;
+  let goalType = null;
+  let currentGameID = 1;
+  let currentFlag = null;
+  let currentStatsView = 'current';
+  // Reset saved sort on full page reload
+  localStorage.removeItem('statsSortCol');
+  localStorage.removeItem('statsSortAsc');
+  let statsSortCol = parseInt(localStorage.getItem('statsSortCol')) || 0;
+  let statsSortAsc = localStorage.getItem('statsSortAsc') !== 'false';
+
+  function updateMenu() {
+    const panel = document.getElementById('menu-panel');
+    panel.innerHTML = `
+      <div class="menu-item" onclick="startNewGame(); toggleMenu()">Start New Game</div>
+      ${currentPage === 'main'
+        ? '<div class="menu-item" onclick="switchPage(\'stats\'); toggleMenu()">Live +/- Stats</div>'
+        : '<div class="menu-item" onclick="switchPage(\'main\'); toggleMenu()">Back to Scoring</div>'
+      }
+    `;
+  }
+
+  function toggleMenu() {
+    const overlay = document.getElementById('menu-overlay');
+    overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex';
+    if (overlay.style.display === 'flex') updateMenu();
+  }
+
+  function switchPage(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(page + '-page').classList.add('active');
+    currentPage = page;
+    if (page === 'stats') {
+      document.getElementById('stats-game-id').textContent = currentGameID;
+      loadStats();
+    }
+  }
+
+  function setStatsView(view) {
+    currentStatsView = view;
+    document.getElementById('stats-view-menu').style.display = 'none';
+    const text = view === 'current' ? currentGameID : view === 'last5' ? 'Last 5' : 'ALL';
+    document.getElementById('stats-game-id').textContent = text;
+    loadStats();
+  }
+
+  document.getElementById('stats-game-selector').onclick = e => {
+    e.stopPropagation();
+    const menu = document.getElementById('stats-view-menu');
+    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+  };
+  document.addEventListener('click', () => document.getElementById('stats-view-menu').style.display = 'none');
+
+  function startNewGame() {
+    google.script.run.withSuccessHandler(id => {
+      currentGameID = id;
+      document.getElementById('main-game-id').textContent = `Game ${id}`;
+      document.getElementById('response').textContent = `New Game ${id} Started!`;
+      toggleMenu();
+      loadGoalLog();
+      setTimeout(() => document.getElementById('response').textContent = '', 3000);
+    }).startNewGame();
+  }
+
+  function selectGoalType(t) { goalType = t;
+    document.getElementById('goal-for').classList.toggle('selected', t==='GF');
+    document.getElementById('goal-against').classList.toggle('selected', t==='GA');
+  }
+
+  function toggleExtra() {
+    extraVisible = !extraVisible;
+    document.getElementById('extra-section').style.display = extraVisible ? 'block' : 'none';
+    document.getElementById('extra-toggle').textContent = extraVisible ? 'Remove Extra Skater' : 'Add Extra Skater';
+    document.getElementById('extra-toggle').classList.toggle('active', extraVisible);
+    if (!extraVisible) currentSelections[5] = null;
+    renderAll();
+  }
+
+  function toggleFlag() {
+    const sel = document.getElementById('flag-select');
+    sel.style.display = sel.style.display === 'block' ? 'none' : 'block';
+    if (sel.style.display === 'none' && !currentFlag) document.getElementById('flag-toggle').textContent = 'Add a Flag';
+  }
+
+  function selectFlag(v) {
+    currentFlag = v || null;
+    document.getElementById('flag-toggle').textContent = currentFlag || 'Add a Flag';
+    document.getElementById('flag-toggle').classList.toggle('active', !!currentFlag);
+    document.getElementById('flag-select').style.display = 'none';
+  }
+
+  function renderAll() {
+    renderSection('defence', 0, 2);
+    renderSection('forwards', 2, 5);
+    if (extraVisible) renderSection('extra', 5, 6);
+  }
+
+  function renderSection(id, start, end) {
+    const container = document.getElementById(id);
+    container.innerHTML = '';
+    for (let i = start; i < end; i++) {
+      const select = document.createElement('select');
+      select.innerHTML = '<option value="">--</option>';
+      ALL_NUMBERS.forEach(n => {
+        if (currentSelections.includes(n) && currentSelections.indexOf(n) !== i) return;
+        select.add(new Option(n, n, false, currentSelections[i] === n));
+      });
+      select.onchange = () => {
+        currentSelections[i] = select.value ? Number(select.value) : null;
+        renderAll();
+      };
+      container.appendChild(select);
+    }
+  }
+
+  function submitForm() {
+    if (!goalType) { document.getElementById('response').textContent = 'Must select Goal For or Goal Against'; return; }
+    const sel = currentSelections.slice(0, extraVisible ? 6 : 5).filter(v => v !== null);
+    const isShootout = currentFlag === 'SO';
+    if (sel.length === 0 && !isShootout) { document.getElementById('response').textContent = 'Select at least one player'; return; }
+
+    const period = document.getElementById('period-select').value;
+    const time = document.getElementById('time-input').value;
+
+    google.script.run
+      .withSuccessHandler(() => {
+        document.getElementById('response').textContent = 'Saved!';
+        currentSelections.fill(null);
+        extraVisible = false; goalType = null; currentFlag = null;
+        document.getElementById('extra-section').style.display = 'none';
+        document.getElementById('extra-toggle').textContent = 'Add Extra Skater'; document.getElementById('extra-toggle').classList.remove('active');
+        document.getElementById('flag-toggle').textContent = 'Add a Flag'; document.getElementById('flag-toggle').classList.remove('active');
+        document.getElementById('flag-select').style.display = 'none';
+        document.getElementById('goal-for').classList.remove('selected');
+        document.getElementById('goal-against').classList.remove('selected');
+        document.getElementById('period-select').value = '';
+        document.getElementById('time-input').value = '';
+        document.getElementById('flag-select').value = '';
+        renderAll();
+        loadGoalLog();
+        setTimeout(() => document.getElementById('response').textContent = '', 2500);
+      })
+      .saveWithGoalTypeFlagAndGameID(sel, goalType, currentFlag, currentGameID, period, time);
+  }
+
+  function loadGoalLog() {
+    google.script.run.withSuccessHandler(data => {
+      currentGameID = data.currentGameID;
+      document.getElementById('main-game-id').textContent = `Game ${currentGameID}`;
+      const log = document.getElementById('goal-log');
+      if (!data.goals.length) { log.innerHTML = '<em>No goals yet</em>'; return; }
+      log.innerHTML = data.goals.map(r => {
+        const type = r[6], flag = r[7] ? ` [${r[7]}]` : '';
+        const players = r.slice(0,6).filter(x=>x).join(', ');
+        return `<div class="goal-entry"><span class="${type==='GF'?'gf':'ga'}">${type}${flag}</span><span>${players}</span></div>`;
+      }).join('');
+    }).getCurrentGameData();
+  }
+
+function sortTable(col) {
+  if (statsSortCol === col) statsSortAsc = !statsSortAsc;
+  else statsSortAsc = (col === 3); // Ratio defaults to descending (high to low = worse to better)
+  statsSortCol = col;
+  localStorage.setItem('statsSortCol', col);
+  localStorage.setItem('statsSortAsc', statsSortAsc);
+
+  document.querySelectorAll('#stats-page th').forEach(th => th.classList.remove('asc','desc'));
+  const thId = col === 0 ? 'th-player' : col === 1 ? 'th-dname' : col === 2 ? 'th-pm' : 'th-ratio';
+  document.getElementById(thId).classList.add(statsSortAsc ? 'asc' : 'desc');
+
+  const tbody = document.getElementById('stats-body');
+  const rows = Array.from(tbody.rows);
+
+  rows.sort((a, b) => {
+    let A, B;
+    if (col === 0) { A = Number(a.cells[0].textContent); B = Number(b.cells[0].textContent); }
+    else if (col === 1) {
+  A = a.cells[1].textContent.trim().toLowerCase();
+  B = b.cells[1].textContent.trim().toLowerCase();
+}
+    else if (col === 2) { A = Number(a.cells[2].textContent.replace('+','')); B = Number(b.cells[2].textContent.replace('+','')); }
+    else if (col === 3) {
+      const ra = a.cells[3].textContent.trim();
+      const rb = b.cells[3].textContent.trim();
+      A = ra === '—' ? Infinity : parseFloat(ra) || 0;
+      B = rb === '—' ? Infinity : parseFloat(rb) || 0;
+    }
+    let primary = statsSortAsc ? (A < B ? -1 : A > B ? 1 : 0) : (B < A ? -1 : B > A ? 1 : 0);
+    if (primary !== 0) return primary;
+
+    // Secondary sort by player number (ascending)
+    const playerA = Number(a.cells[0].textContent);
+    const playerB = Number(b.cells[0].textContent);
+    return playerA - playerB;
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+function loadStats() {
+  document.getElementById('stats-loading').style.display = 'block';
+  document.getElementById('stats-table').style.display = 'none';
+
+  const handler = currentStatsView === 'current' ? 'getLivePlusMinus' :
+                  currentStatsView === 'last5' ? 'getLast5GamesPlusMinus' : 'getAllGamesPlusMinus';
+
+  google.script.run
+    .withSuccessHandler(data => {
+      const stats = data.stats || data || [];
+      const tbody = document.getElementById('stats-body');
+      tbody.innerHTML = '';
+
+      if (stats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4">No goals yet</td></tr>';
+      } else {
+        stats.forEach(p => {
+          const ratio = p.ratio ?? '—';
+          let ratioClass = 'zero';
+          if (ratio !== '—') {
+            const val = parseFloat(ratio);
+            if (val < 1) ratioClass = 'positive';
+            else if (val > 1) ratioClass = 'negative';
+          }
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${p.player}</td>
+            <td style="font-weight:bold;">${p.dname}</td>
+            <td class="${p.pm > 0 ? 'positive' : p.pm < 0 ? 'negative' : 'zero'}">
+              ${p.pm > 0 ? '+' : ''}${p.pm}
+            </td>
+            <td class="${ratioClass}">${ratio}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      document.getElementById('stats-loading').style.display = 'none';
+      document.getElementById('stats-table').style.display = 'table';
+
+      const rowCount = tbody.querySelectorAll('tr').length;
+      document.body.style.overflow = rowCount > 15 ? 'auto' : 'hidden';
+
+      sortTable(statsSortCol); // Apply your current sort on initial load
+    })
+    [handler]();
+}
+  function applySavedSortOnly() {
+    document.querySelectorAll('#stats-page th').forEach(th => th.classList.remove('asc','desc'));
+    const thId = statsSortCol === 0 ? 'th-player' : statsSortCol === 1 ? 'th-pm' : 'th-ratio';
+    document.getElementById(thId).classList.add(statsSortAsc ? 'asc' : 'desc');
+
+    const tbody = document.getElementById('stats-body');
+    const rows = Array.from(tbody.rows);
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      let A = a.cells[statsSortCol].textContent.trim();
+      let B = b.cells[statsSortCol].textContent.trim();
+      if (statsSortCol === 1) { A = Number(A.replace('+','')); B = Number(B.replace('+','')); }
+      else if (statsSortCol === 2) { A = A === '—' ? 0 : parseFloat(A); B = B === '—' ? 0 : parseFloat(B); }
+      else { A = Number(A); B = Number(B); }
+      return statsSortAsc ? (A - B) : (B - A);
+    });
+    rows.forEach(r => tbody.appendChild(r));
+  }
+
+// Smart silent auto-refresh every 10 seconds — no flicker, no bouncing
+let lastStats = []; // Remember the last data we saw
+
+setInterval(() => {
+  if (currentPage !== 'stats') return;
+
+  const handler = currentStatsView === 'current' ? 'getLivePlusMinus' :
+                  currentStatsView === 'last5' ? 'getLast5GamesPlusMinus' : 'getAllGamesPlusMinus';
+
+  google.script.run
+    .withSuccessHandler(data => {
+      const newStats = (data.stats || data || []).map(p => ({
+        player: p.player,
+        dname: p.dname || `#${p.player}`,
+        pm: p.pm,
+        ratio: p.ratio ?? '—'
+      }));
+
+      // Compare actual data, not HTML
+      const dataChanged = JSON.stringify(lastStats) !== JSON.stringify(newStats);
+
+      if (dataChanged) {
+        lastStats = newStats; // Update memory
+
+        const tbody = document.getElementById('stats-body');
+        tbody.innerHTML = '';
+
+        if (newStats.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4">No goals yet</td></tr>';
+        } else {
+          newStats.forEach(p => {
+            const ratio = p.ratio;
+            let ratioClass = 'zero';
+            if (ratio !== '—') {
+              const val = parseFloat(ratio);
+              if (val < 1) ratioClass = 'positive';
+              else if (val > 1) ratioClass = 'negative';
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${p.player}</td>
+              <td style="font-weight:bold;">${p.dname}</td>
+              <td class="${p.pm > 0 ? 'positive' : p.pm < 0 ? 'negative' : 'zero'}">
+                ${p.pm > 0 ? '+' : ''}${p.pm}
+              </td>
+              <td class="${ratioClass}">${ratio}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        // Re-apply your CURRENT sort and arrow
+        sortTable(statsSortCol);
+      }
+    })
+    [handler]();
+}, 10000);
+
+  // Init — load player numbers from Roster sheet first
+  google.script.run
+    .withSuccessHandler(function(numbers) {
+      ALL_NUMBERS = numbers;
+      renderAll();
+      loadGoalLog();
+    })
+    .getRosterNumbers();
+</script>
+</body>
+</html>
