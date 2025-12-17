@@ -7,6 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0066ff">
   <link rel="manifest" href="?q=manifest">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <title>Plus Minus</title>
   <style>
     body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#f5f5f5; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
@@ -71,6 +72,16 @@
     #stats-page .negative { color:#d32f2f; }
     #stats-page .zero { color:#666; }
     #stats-page .loading { text-align:center; font-size:40px; color:#666; margin-top:100px; }
+    #stats-page td.player-name { cursor:pointer; text-decoration:underline; }
+    #stats-page td.player-name:hover { opacity:0.7; }
+
+    .chart-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:1000; }
+    .chart-panel { background:white; width:90%; max-width:800px; border-radius:24px; padding:30px; box-shadow:0 20px 50px rgba(0,0,0,0.4); max-height:90vh; overflow-y:auto; }
+    .chart-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+    .chart-title { font-size:42px; font-weight:800; color:#222; }
+    .chart-close { font-size:48px; background:none; border:none; color:#666; cursor:pointer; width:60px; height:60px; display:flex; align-items:center; justify-content:center; }
+    .chart-close:hover { color:#222; }
+    .chart-container { position:relative; height:400px; margin-top:20px; }
 
     .page { display:none; }
     .page.active { display:block; }
@@ -153,6 +164,7 @@
       <div class="menu-item" style="font-size:32px; padding:16px 24px;" onclick="setStatsView('current')">Current Game</div>
       <div class="menu-item" style="font-size:32px; padding:16px 24px;" onclick="setStatsView('last5')">Last 5</div>
       <div class="menu-item" style="font-size:32px; padding:16px 24px;" onclick="setStatsView('all')">ALL</div>
+      <div class="menu-item" style="font-size:32px; padding:16px 24px;" onclick="setStatsView('incOdd')">Inc odd</div>
     </div>
 
     <main>
@@ -173,6 +185,19 @@
 
   <div class="menu-overlay" id="menu-overlay" onclick="toggleMenu()">
     <div class="menu-panel" id="menu-panel" onclick="event.stopPropagation()"></div>
+  </div>
+
+  <!-- Player Chart Modal -->
+  <div class="chart-overlay" id="chart-overlay" onclick="closePlayerChart()">
+    <div class="chart-panel" id="chart-panel" onclick="event.stopPropagation()">
+      <div class="chart-header">
+        <div class="chart-title" id="chart-title">Player Stats</div>
+        <button class="chart-close" onclick="closePlayerChart()" aria-label="Close">×</button>
+      </div>
+      <div class="chart-container">
+        <canvas id="player-chart"></canvas>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -219,7 +244,7 @@
   function setStatsView(view) {
     currentStatsView = view;
     document.getElementById('stats-view-menu').style.display = 'none';
-    const text = view === 'current' ? currentGameID : view === 'last5' ? 'Last 5' : 'ALL';
+    const text = view === 'current' ? currentGameID : view === 'last5' ? 'Last 5' : view === 'all' ? 'ALL' : 'Inc odd';
     document.getElementById('stats-game-id').textContent = text;
     loadStats();
   }
@@ -385,7 +410,8 @@ function loadStats() {
   document.getElementById('stats-table').style.display = 'none';
 
   const handler = currentStatsView === 'current' ? 'getLivePlusMinus' :
-                  currentStatsView === 'last5' ? 'getLast5GamesPlusMinus' : 'getAllGamesPlusMinus';
+                  currentStatsView === 'last5' ? 'getLast5GamesPlusMinus' :
+                  currentStatsView === 'all' ? 'getAllGamesPlusMinus' : 'getAllGamesPlusMinusIncludingOdd';
 
   google.script.run
     .withSuccessHandler(data => {
@@ -408,7 +434,7 @@ function loadStats() {
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${p.player}</td>
-            <td style="font-weight:bold;">${p.dname}</td>
+            <td class="player-name" style="font-weight:bold;" onclick="showPlayerChart(${p.player}, '${p.dname.replace(/'/g, "\\'")}')">${p.dname}</td>
             <td class="${p.pm > 0 ? 'positive' : p.pm < 0 ? 'negative' : 'zero'}">
               ${p.pm > 0 ? '+' : ''}${p.pm}
             </td>
@@ -463,7 +489,8 @@ setInterval(() => {
   if (currentPage !== 'stats') return;
 
   const handler = currentStatsView === 'current' ? 'getLivePlusMinus' :
-                  currentStatsView === 'last5' ? 'getLast5GamesPlusMinus' : 'getAllGamesPlusMinus';
+                  currentStatsView === 'last5' ? 'getLast5GamesPlusMinus' :
+                  currentStatsView === 'all' ? 'getAllGamesPlusMinus' : 'getAllGamesPlusMinusIncludingOdd';
 
   google.script.run
     .withSuccessHandler(data => {
@@ -498,7 +525,7 @@ setInterval(() => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
               <td>${p.player}</td>
-              <td style="font-weight:bold;">${p.dname}</td>
+              <td class="player-name" style="font-weight:bold;" onclick="showPlayerChart(${p.player}, '${p.dname.replace(/'/g, "\\'")}')">${p.dname}</td>
               <td class="${p.pm > 0 ? 'positive' : p.pm < 0 ? 'negative' : 'zero'}">
                 ${p.pm > 0 ? '+' : ''}${p.pm}
               </td>
@@ -514,6 +541,116 @@ setInterval(() => {
     })
     [handler]();
 }, 10000);
+
+  // Player chart functionality
+  let playerChart = null;
+
+  function showPlayerChart(playerNumber, playerName) {
+    document.getElementById('chart-title').textContent = `#${playerNumber} ${playerName} - Game by Game +/-`;
+    document.getElementById('chart-overlay').style.display = 'flex';
+    
+    google.script.run
+      .withSuccessHandler(data => {
+        if (playerChart) {
+          playerChart.destroy();
+        }
+        
+        const games = data.games || [];
+        if (games.length === 0) {
+          document.getElementById('player-chart').getContext('2d').clearRect(0, 0, 0, 0);
+          return;
+        }
+        
+        const ctx = document.getElementById('player-chart').getContext('2d');
+        const gameLabels = games.map(g => `Game ${g.gameId}`);
+        const gamePm = games.map(g => g.pm);
+        const cumulativePm = games.map(g => g.cumulativePm);
+        
+        playerChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: gameLabels,
+            datasets: [
+              {
+                label: 'Game +/-',
+                data: gamePm,
+                backgroundColor: gamePm.map(pm => pm > 0 ? '#0d8f3c' : pm < 0 ? '#d32f2f' : '#666'),
+                borderColor: gamePm.map(pm => pm > 0 ? '#0d8f3c' : pm < 0 ? '#d32f2f' : '#666'),
+                borderWidth: 2
+              },
+              {
+                label: 'Cumulative +/-',
+                data: cumulativePm,
+                type: 'line',
+                borderColor: '#0066ff',
+                backgroundColor: 'transparent',
+                borderWidth: 3,
+                pointRadius: 4,
+                pointBackgroundColor: '#0066ff',
+                fill: false,
+                tension: 0.1
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                  font: { size: 16, weight: 'bold' },
+                  padding: 15
+                }
+              },
+              tooltip: {
+                enabled: true,
+                callbacks: {
+                  label: function(context) {
+                    const value = context.parsed.y;
+                    return context.dataset.label + ': ' + (value > 0 ? '+' : '') + value;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: false,
+                ticks: {
+                  font: { size: 14 },
+                  callback: function(value) {
+                    return value > 0 ? '+' + value : value;
+                  }
+                },
+                grid: {
+                  color: '#eee'
+                }
+              },
+              x: {
+                ticks: {
+                  font: { size: 12 },
+                  maxRotation: 45,
+                  minRotation: 45
+                },
+                grid: {
+                  display: false
+                }
+              }
+            }
+          }
+        });
+      })
+      .getPlayerGameStats(playerNumber);
+  }
+
+  function closePlayerChart() {
+    document.getElementById('chart-overlay').style.display = 'none';
+    if (playerChart) {
+      playerChart.destroy();
+      playerChart = null;
+    }
+  }
 
   // Init — load player numbers from Roster sheet first
   google.script.run

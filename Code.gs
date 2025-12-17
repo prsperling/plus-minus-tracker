@@ -75,6 +75,7 @@ function getLivePlusMinus() {
 // LAST 5 + ALL
 function getLast5GamesPlusMinus() { return calcStats(getSheet().getDataRange().getValues(), getLastNGameIds(5)); }
 function getAllGamesPlusMinus()   { return calcStats(getSheet().getDataRange().getValues(), null); }
+function getAllGamesPlusMinusIncludingOdd() { return calcStats(getSheet().getDataRange().getValues(), null, true); }
 
 function getLastNGameIds(n) {
   const data = getSheet().getDataRange().getValues();
@@ -83,7 +84,7 @@ function getLastNGameIds(n) {
 }
 
 // MAIN STATS — WITH DNAME
-function calcStats(data, targetGameIds) {
+function calcStats(data, targetGameIds, includeOddMan = false) {
   const rosterMap = getRosterMap();
   const stats = {};
 
@@ -94,8 +95,8 @@ function calcStats(data, targetGameIds) {
 
     const type = r[6];
     const flag = r[7] || '';
-    const isGF = type === 'GF' && flag !== 'Iggy PP';
-    const isGA = type === 'GA' && flag !== 'Iggy SH';
+    const isGF = includeOddMan ? type === 'GF' : (type === 'GF' && flag !== 'Iggy PP');
+    const isGA = includeOddMan ? type === 'GA' : (type === 'GA' && flag !== 'Iggy SH');
     if (!isGF && !isGA) return;
 
     r.slice(0,6)
@@ -152,4 +153,59 @@ function saveWithGoalTypeFlagAndGameID(numbers, goalType, flag, gameID, period, 
 function getRosterNumbers() {
   const map = getRosterMap();
   return Object.keys(map).map(k => Number(k)).sort((a,b)=>a-b);
+}
+
+// Get player's +/- per game for chart
+function getPlayerGameStats(playerNumber) {
+  const data = getSheet().getDataRange().getValues();
+  const rosterMap = getRosterMap();
+  const playerInfo = rosterMap[playerNumber] || { dname: `#${playerNumber}` };
+  
+  // First, collect all unique game IDs in order
+  const allGameIds = [...new Set(data.slice(1).map(r => r[8]).filter(Boolean))].sort((a, b) => a - b);
+  
+  const gameStats = {};
+  
+  // Initialize all games with 0 pm
+  allGameIds.forEach(gameId => {
+    gameStats[gameId] = { gameId: gameId, pm: 0 };
+  });
+  
+  // Process goals and calculate pm for each game
+  data.slice(1).forEach(r => {
+    const gameId = r[8];
+    if (!gameId || r[7] === 'GAME START') return;
+    
+    const type = r[6];
+    const flag = r[7] || '';
+    const isGF = type === 'GF' && flag !== 'Iggy PP';
+    const isGA = type === 'GA' && flag !== 'Iggy SH';
+    
+    const players = r.slice(0,6).filter(x => x !== '').map(x => Number(x));
+    if (players.includes(playerNumber)) {
+      if (isGF) {
+        gameStats[gameId].pm++;
+      }
+      if (isGA) {
+        gameStats[gameId].pm--;
+      }
+    }
+  });
+  
+  // Calculate cumulative pm for each game
+  let cumulativePm = 0;
+  const games = allGameIds.map(gameId => {
+    cumulativePm += gameStats[gameId].pm;
+    return {
+      gameId: gameId,
+      pm: gameStats[gameId].pm,
+      cumulativePm: cumulativePm
+    };
+  });
+  
+  return {
+    player: playerNumber,
+    dname: playerInfo.dname,
+    games: games
+  };
 }
