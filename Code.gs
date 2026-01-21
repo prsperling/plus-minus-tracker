@@ -2,6 +2,7 @@
 
 const DATA_SHEET_NAME = 'Goals';
 const ROSTER_SHEET_NAME = 'Roster';
+const GAMES_SHEET_NAME = 'Games';
 
 function getSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -11,6 +12,11 @@ function getSheet() {
 function getRosterSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   return ss.getSheetByName(ROSTER_SHEET_NAME);
+}
+
+function getGamesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  return ss.getSheetByName(GAMES_SHEET_NAME);
 }
 
 // Load roster: number → dname
@@ -153,6 +159,218 @@ function saveWithGoalTypeFlagAndGameID(numbers, goalType, flag, gameID, period, 
 function getRosterNumbers() {
   const map = getRosterMap();
   return Object.keys(map).map(k => Number(k)).sort((a,b)=>a-b);
+}
+
+// Get game results with scores and record
+function getGameResults() {
+  const gamesSheet = getGamesSheet();
+  if (!gamesSheet) return { record: {w: 0, l: 0, t: 0, ot: 0, so: 0}, games: []};
+  
+  const gamesData = gamesSheet.getDataRange().getValues();
+  if (gamesData.length <= 1) return { record: {w: 0, l: 0, t: 0, ot: 0, so: 0}, games: []};
+  
+  // Find column indices
+  const headerRow = gamesData[0];
+  const gameDetIdCol = headerRow.indexOf('GameDetID');
+  const dateCol = headerRow.indexOf('Date');
+  const visitorCol = headerRow.indexOf('Visitor');
+  const homeCol = headerRow.indexOf('Home');
+  const detailsCol = headerRow.indexOf('Details');
+  
+  if (gameDetIdCol === -1) return { record: {w: 0, l: 0, t: 0, ot: 0, so: 0}, games: []};
+  
+  // Get scores from Goals sheet and track which games have 'GAME START'
+  const goalsData = getSheet().getDataRange().getValues();
+  const gameScores = {};
+  const gamePeriods = {};
+  const gamesWithStart = new Set(); // Track games that have 'GAME START'
+  
+  goalsData.slice(1).forEach(r => {
+    const gameId = r[8];
+    if (!gameId) return;
+    
+    // Track games that have 'GAME START'
+    if (r[7] === 'GAME START') {
+      gamesWithStart.add(gameId);
+      return;
+    }
+    
+    if (!gameScores[gameId]) {
+      gameScores[gameId] = { gf: 0, ga: 0 };
+    }
+    
+    const type = r[6];
+    const flag = r[7] || '';
+    const period = r[9] || '';
+    
+    // Track if game went to OT or SO
+    if (period === 'OT' && !gamePeriods[gameId]) {
+      gamePeriods[gameId] = 'OT';
+    }
+    if (flag === 'SO' && !gamePeriods[gameId]) {
+      gamePeriods[gameId] = 'SO';
+    }
+    
+    // Count ALL goals for final score (including PP and SH)
+    const isGF = type === 'GF';
+    const isGA = type === 'GA';
+    
+    if (isGF) gameScores[gameId].gf++;
+    if (isGA) gameScores[gameId].ga++;
+  });
+  
+  const TEAM_NAME = 'St. Ignatius Wolfpack (JV)';
+  const results = [];
+  let record = { w: 0, l: 0, t: 0, ot: 0, so: 0 };
+  
+  gamesData.slice(1).forEach(row => {
+    const gameDetId = row[gameDetIdCol];
+    if (!gameDetId) return;
+    
+    // Only include games that have a 'GAME START' entry
+    if (!gamesWithStart.has(gameDetId)) return;
+    
+    const visitor = visitorCol >= 0 ? (row[visitorCol] || '').toString().trim() : '';
+    const home = homeCol >= 0 ? (row[homeCol] || '').toString().trim() : '';
+    const date = dateCol >= 0 ? row[dateCol] : '';
+    
+    // Determine opponent
+    const opponent = visitor === TEAM_NAME ? home : visitor;
+    if (!opponent) return;
+    
+    // Get scores for this game
+    const scores = gameScores[gameDetId] || { gf: 0, ga: 0 };
+    const gf = scores.gf;
+    const ga = scores.ga;
+    
+    // Determine result
+    let result = '';
+    const periodType = gamePeriods[gameDetId] || '';
+    
+    if (gf > ga) {
+      // Win (regardless of OT/SO)
+      result = 'Win';
+      record.w++;
+    } else if (ga > gf) {
+      // Loss - check if OT or SO
+      if (periodType === 'SO') {
+        result = 'SO Loss';
+        record.so++;
+      } else if (periodType === 'OT') {
+        result = 'OT Loss';
+        record.ot++;
+      } else {
+        result = 'Loss';
+        record.l++;
+      }
+    } else {
+      result = 'Tie';
+      record.t++;
+    }
+    
+    results.push({
+      gameDetId: gameDetId,
+      date: date,
+      opponent: opponent,
+      score: `${gf} - ${ga}`,
+      result: result,
+      gf: gf,
+      ga: ga
+    });
+  });
+  
+  // Sort by gameDetId (game number)
+  results.sort((a, b) => a.gameDetId - b.gameDetId);
+  
+  return {
+    record: record,
+    games: results
+  };
+}
+
+// Get individual game details with goal log
+function getGameDetails(gameDetId) {
+  const gamesSheet = getGamesSheet();
+  if (!gamesSheet) return null;
+  
+  const gamesData = gamesSheet.getDataRange().getValues();
+  const headerRow = gamesData[0];
+  const gameDetIdCol = headerRow.indexOf('GameDetID');
+  const dateCol = headerRow.indexOf('Date');
+  const visitorCol = headerRow.indexOf('Visitor');
+  const homeCol = headerRow.indexOf('Home');
+  const locationCol = headerRow.indexOf('Location');
+  const detailsCol = headerRow.indexOf('Details');
+  const gameTimeCol = headerRow.indexOf('GameTime') !== -1 ? headerRow.indexOf('GameTime') : headerRow.indexOf('Game Time');
+  
+  if (gameDetIdCol === -1) return null;
+  
+  // Find the game row
+  let gameRow = null;
+  for (let i = 1; i < gamesData.length; i++) {
+    if (gamesData[i][gameDetIdCol] === gameDetId) {
+      gameRow = gamesData[i];
+      break;
+    }
+  }
+  
+  if (!gameRow) return null;
+  
+  const TEAM_NAME = 'St. Ignatius Wolfpack (JV)';
+  const visitor = visitorCol >= 0 ? (gameRow[visitorCol] || '').toString().trim() : '';
+  const home = homeCol >= 0 ? (gameRow[homeCol] || '').toString().trim() : '';
+  const opponent = visitor === TEAM_NAME ? home : visitor;
+  const date = dateCol >= 0 ? gameRow[dateCol] : '';
+  const location = locationCol >= 0 ? (gameRow[locationCol] || '').toString().trim() : '';
+  const gameTime = gameTimeCol >= 0 ? (gameRow[gameTimeCol] || '').toString().trim() : '';
+  
+  // Get all goals for this game
+  const goalsData = getSheet().getDataRange().getValues();
+  const goals = [];
+  
+  goalsData.slice(1).forEach(r => {
+    if (r[8] === gameDetId && r[7] !== 'GAME START') {
+      const type = r[6];
+      const flag = r[7] || '';
+      const period = r[9] || '';
+      const time = r[10] || '';
+      const players = r.slice(0, 6).filter(x => x !== '').map(x => Number(x));
+      
+      if (type === 'GF' || type === 'GA') {
+        goals.push({
+          type: type,
+          flag: flag,
+          period: period,
+          time: time,
+          players: players
+        });
+      }
+    }
+  });
+  
+  return {
+    gameDetId: gameDetId,
+    opponent: opponent,
+    date: date,
+    location: location,
+    gameTime: gameTime,
+    goals: goals
+  };
+}
+
+// Get list of all game IDs with GAME START (for navigation)
+function getGameIdsList() {
+  const goalsData = getSheet().getDataRange().getValues();
+  const gameIds = [];
+  
+  goalsData.slice(1).forEach(r => {
+    const gameId = r[8];
+    if (gameId && r[7] === 'GAME START') {
+      gameIds.push(gameId);
+    }
+  });
+  
+  return gameIds.sort((a, b) => a - b);
 }
 
 // Get player's +/- per game for chart

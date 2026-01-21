@@ -75,6 +75,45 @@
     #stats-page td.player-name { cursor:pointer; text-decoration:underline; }
     #stats-page td.player-name:hover { opacity:0.7; }
 
+    #games-page table { width:100%; max-width:700px; border-collapse:collapse; background:white; border-radius:20px; overflow:hidden; box-shadow:0 6px 20px rgba(0,0,0,0.15); }
+    #games-page th { background:#0066ff; color:white; padding:24px; font-size:36px; font-weight:800; }
+    #games-page td { padding:20px; text-align:center; font-size:32px; font-weight:bold; border-bottom:2px solid #eee; }
+    #games-page tr:last-child td { border-bottom:none; }
+    #games-page .record { text-align:center; font-size:42px; font-weight:800; color:#222; margin:30px 0 20px 0; padding:20px; background:#e8f0ff; border-radius:16px; }
+    #games-page .win { color:#0d8f3c; }
+    #games-page .loss { color:#d32f2f; }
+    #games-page .tie { color:#666; }
+    #games-page .loading { text-align:center; font-size:40px; color:#666; margin-top:100px; }
+    #games-page td.score { cursor:pointer; text-decoration:underline; }
+    #games-page td.score:hover { opacity:0.7; }
+
+    #game-view-page .game-info { width:100%; max-width:700px; background:white; border-radius:20px; padding:24px; margin:30px 0; box-shadow:0 6px 20px rgba(0,0,0,0.15); }
+    #game-view-page .game-info-item { font-size:48px; font-weight:700; margin:16px 0; color:#222; text-align:center; }
+    #game-view-page .game-info-item.result-win { color:#0d8f3c; }
+    #game-view-page .game-info-item.result-tie { color:#000; }
+    #game-view-page .game-info-item.result-loss { color:#d32f2f; }
+    #game-view-page .game-goal-log { width:100%; max-width:700px; background:white; border-radius:20px; padding:24px; margin:30px 0; box-shadow:0 6px 20px rgba(0,0,0,0.12); }
+    #game-view-page .period-section { margin:30px 0; }
+    #game-view-page .period-section:first-child { margin-top:0; }
+    #game-view-page .period-header { font-size:42px; font-weight:800; color:#0066ff; margin-bottom:20px; padding:12px; background:#e8f0ff; border-radius:12px; text-align:center; }
+    #game-view-page .goal-entry { padding:20px 0; border-bottom:2px solid #eee; display:block; }
+    #game-view-page .goal-entry:last-child { border-bottom:none; }
+    #game-view-page .goal-row { display:flex; justify-content:space-between; align-items:center; font-size:48px; font-weight:700; margin-bottom:8px; width:100%; }
+    #game-view-page .goal-row .goal-type { flex:1; text-align:left; white-space:nowrap; }
+    #game-view-page .goal-row .goal-flag { flex:1; text-align:center; white-space:nowrap; }
+    #game-view-page .goal-row .goal-time { flex:1; text-align:right; white-space:nowrap; }
+    #game-view-page .goal-players { display:block; width:100%; }
+    #game-view-page .goal-row.gf { color:#0d8f3c !important; }
+    #game-view-page .goal-row.ga { color:#d32f2f !important; }
+    #game-view-page .goal-row.gf .goal-type,
+    #game-view-page .goal-row.gf .goal-flag,
+    #game-view-page .goal-row.gf .goal-time { color:#0d8f3c !important; }
+    #game-view-page .goal-row.ga .goal-type,
+    #game-view-page .goal-row.ga .goal-flag,
+    #game-view-page .goal-row.ga .goal-time { color:#d32f2f !important; }
+    #game-view-page .goal-players { font-size:28px; font-weight:bold; color:#000; font-family:monospace; text-align:center; margin-top:8px; }
+    #game-view-page .loading { text-align:center; font-size:40px; color:#666; margin-top:100px; }
+
     .chart-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:1000; }
     .chart-panel { background:white; width:90%; max-width:800px; border-radius:24px; padding:30px; box-shadow:0 20px 50px rgba(0,0,0,0.4); max-height:90vh; overflow-y:auto; }
     .chart-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
@@ -150,6 +189,50 @@
     </main>
   </div>
 
+  <!-- Game View Page -->
+  <div id="game-view-page" class="page">
+    <header>
+      <button class="menu-btn" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      Game View
+      <div class="game-id" id="game-view-game-id">Game 1</div>
+    </header>
+    <main>
+      <div class="loading" id="game-view-loading">Loading game...</div>
+      <div id="game-view-content" style="display:none;">
+        <div class="game-info">
+          <div class="game-info-item" id="game-view-opponent"></div>
+          <div class="game-info-item" id="game-view-location"></div>
+          <div class="game-info-item" id="game-view-date"></div>
+          <div class="game-info-item" id="game-view-time"></div>
+          <div class="game-info-item" id="game-view-result"></div>
+        </div>
+        <div class="game-goal-log" id="game-view-goals"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Games Results Page -->
+  <div id="games-page" class="page">
+    <header>
+      <button class="menu-btn" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      Game Results
+    </header>
+    <main>
+      <div class="loading" id="games-loading">Loading games...</div>
+      <div id="games-record" class="record" style="display:none;"></div>
+      <table id="games-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>Opponent</th>
+            <th>Score</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody id="games-body"></tbody>
+      </table>
+    </main>
+  </div>
+
   <!-- Live Stats Page -->
   <div id="stats-page" class="page">
     <header>
@@ -222,6 +305,7 @@
         ? '<div class="menu-item" onclick="switchPage(\'stats\'); toggleMenu()">Live +/- Stats</div>'
         : '<div class="menu-item" onclick="switchPage(\'main\'); toggleMenu()">Back to Scoring</div>'
       }
+      <div class="menu-item" onclick="switchPage('games'); toggleMenu()">Game Results</div>
     `;
   }
 
@@ -231,6 +315,9 @@
     if (overlay.style.display === 'flex') updateMenu();
   }
 
+  let gameIdsList = [];
+  let currentGameViewId = null;
+
   function switchPage(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(page + '-page').classList.add('active');
@@ -238,7 +325,15 @@
     if (page === 'stats') {
       document.getElementById('stats-game-id').textContent = currentGameID;
       loadStats();
+    } else if (page === 'games') {
+      loadGameResults();
     }
+  }
+
+  function showGameView(gameDetId) {
+    currentGameViewId = gameDetId;
+    switchPage('game-view');
+    loadGameView(gameDetId);
   }
 
   function setStatsView(view) {
@@ -650,6 +745,289 @@ setInterval(() => {
       playerChart.destroy();
       playerChart = null;
     }
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr || dateStr === 'N/A') return 'N/A';
+    
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+      const day = date.getDate();
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+      
+      return `${month} ${day}, ${year}`;
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  function formatTime(timeStr) {
+    if (!timeStr || timeStr === 'N/A') {
+      return 'N/A';
+    }
+    
+    try {
+      // Extract time from ISO datetime string (e.g., "2025-10-04T16:10:00.000Z")
+      if (typeof timeStr === 'string' && timeStr.includes('T')) {
+        const timePart = timeStr.split('T')[1];
+        if (timePart) {
+          const timeOnly = timePart.split('.')[0]; // Remove milliseconds
+          const parts = timeOnly.split(':');
+          const hour = parseInt(parts[0], 10);
+          const minute = parts[1] ? parseInt(parts[1], 10) : 0;
+          const ampm = hour >= 12 ? 'PM' : 'AM';
+          const hour12 = hour % 12 || 12;
+          const minutesStr = minute < 10 ? '0' + minute : minute;
+          return `${hour12}:${minutesStr} ${ampm}`;
+        }
+      }
+      
+      // If it's in HH:MM or HH:MM:SS format (just time, no date)
+      if (typeof timeStr === 'string' && timeStr.includes(':')) {
+        const parts = timeStr.split(':');
+        const hour = parseInt(parts[0], 10);
+        const minute = parts[1] ? parseInt(parts[1].split('.')[0], 10) : 0;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 || 12;
+        const minutesStr = minute < 10 ? '0' + minute : minute;
+        return `${hour12}:${minutesStr} ${ampm}`;
+      }
+      
+      // Try to parse as a date/time string (fallback)
+      const date = new Date(timeStr);
+      if (!isNaN(date.getTime())) {
+        // Extract UTC hours/minutes to avoid timezone conversion
+        const isoMatch = timeStr.match(/T(\d{2}):(\d{2})/);
+        if (isoMatch) {
+          const hour = parseInt(isoMatch[1], 10);
+          const minute = parseInt(isoMatch[2], 10);
+          const ampm = hour >= 12 ? 'PM' : 'AM';
+          const hour12 = hour % 12 || 12;
+          const minutesStr = minute < 10 ? '0' + minute : minute;
+          return `${hour12}:${minutesStr} ${ampm}`;
+        }
+        
+        let hours = date.getHours();
+        const minutes = date.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+        return `${hours}:${minutesStr} ${ampm}`;
+      }
+      
+      return timeStr;
+    } catch (e) {
+      return timeStr;
+    }
+  }
+
+  function loadGameView(gameDetId) {
+    document.getElementById('game-view-loading').style.display = 'block';
+    document.getElementById('game-view-content').style.display = 'none';
+    document.getElementById('game-view-game-id').textContent = `Game ${gameDetId}`;
+    
+    google.script.run
+      .withSuccessHandler(data => {
+        if (!data) {
+          document.getElementById('game-view-loading').textContent = 'Game not found';
+          return;
+        }
+        
+        document.getElementById('game-view-opponent').textContent = data.opponent || 'N/A';
+        document.getElementById('game-view-location').textContent = data.location || 'N/A';
+        
+        // Handle date and time - date field might contain full datetime
+        const dateValue = data.date || '';
+        const gameTimeValue = data.gameTime || data.date || '';
+        
+        document.getElementById('game-view-date').textContent = formatDate(dateValue);
+        document.getElementById('game-view-time').textContent = formatTime(gameTimeValue);
+        
+        // Calculate result and score
+        let gf = 0;
+        let ga = 0;
+        let hasOT = false;
+        let hasSO = false;
+        
+        if (data.goals && data.goals.length > 0) {
+          data.goals.forEach(goal => {
+            if (goal.type === 'GF') gf++;
+            if (goal.type === 'GA') ga++;
+            if (goal.period === 'OT') hasOT = true;
+            if (goal.flag === 'SO') hasSO = true;
+          });
+        }
+        
+        let result = '';
+        let resultClass = '';
+        if (gf > ga) {
+          result = 'Win';
+          resultClass = 'result-win';
+        } else if (ga > gf) {
+          if (hasSO) {
+            result = 'SO Loss';
+            resultClass = 'result-loss';
+          } else if (hasOT) {
+            result = 'OT Loss';
+            resultClass = 'result-loss';
+          } else {
+            result = 'Loss';
+            resultClass = 'result-loss';
+          }
+        } else {
+          result = 'Tie';
+          resultClass = 'result-tie';
+        }
+        
+        const resultElement = document.getElementById('game-view-result');
+        resultElement.textContent = `${result} ${gf} - ${ga}`;
+        resultElement.className = 'game-info-item ' + resultClass;
+        
+        // Group goals by period
+        const goalsByPeriod = {};
+        if (data.goals && data.goals.length > 0) {
+          data.goals.forEach(goal => {
+            const period = goal.period || 'Unknown';
+            if (!goalsByPeriod[period]) {
+              goalsByPeriod[period] = [];
+            }
+            goalsByPeriod[period].push(goal);
+          });
+        }
+        
+        const goalsHtml = Object.keys(goalsByPeriod).length > 0
+          ? Object.keys(goalsByPeriod).sort((a, b) => {
+              // Sort periods: 1, 2, 3, OT, Unknown
+              const order = { '1': 1, '2': 2, '3': 3, 'OT': 4, 'Unknown': 99 };
+              return (order[a] || 99) - (order[b] || 99);
+            }).map(period => {
+              const periodGoals = goalsByPeriod[period];
+              const periodHeader = period === 'Unknown' ? 'Period Unknown' : `Period ${period}`;
+              
+              const goalsHtml = periodGoals.map(goal => {
+                const goalTypeText = goal.type === 'GF' ? 'Goal For' : 'Goal Against';
+                const flagText = goal.flag || '';
+                const timeText = goal.time || '--';
+                const playersText = goal.players.length > 0 ? goal.players.join(', ') : 'No players';
+                const goalTypeClass = goal.type.toLowerCase();
+                
+                return `
+                  <div class="goal-entry">
+                    <div class="goal-row ${goalTypeClass}">
+                      <div class="goal-type">${goalTypeText}</div>
+                      <div class="goal-flag">${flagText}</div>
+                      <div class="goal-time">${timeText}</div>
+                    </div>
+                    <div class="goal-players">${playersText}</div>
+                  </div>
+                `;
+              }).join('');
+              
+              return `
+                <div class="period-section">
+                  <div class="period-header">${periodHeader}</div>
+                  ${goalsHtml}
+                </div>
+              `;
+            }).join('')
+          : '<div class="period-section"><div class="period-header">No Goals</div><div class="goal-entry" style="color:#666; text-align:center; padding:20px;">No goals recorded</div></div>';
+        
+        document.getElementById('game-view-goals').innerHTML = goalsHtml;
+        
+        document.getElementById('game-view-loading').style.display = 'none';
+        document.getElementById('game-view-content').style.display = 'block';
+      })
+      .getGameDetails(gameDetId);
+  }
+
+  // Swipe navigation for game view
+  let touchStartX = 0;
+  let touchEndX = 0;
+
+  document.getElementById('game-view-page').addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+  });
+
+  document.getElementById('game-view-page').addEventListener('touchend', e => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleGameViewSwipe();
+  });
+
+  function handleGameViewSwipe() {
+    if (!currentGameViewId || gameIdsList.length === 0) return;
+    
+    const currentIndex = gameIdsList.indexOf(currentGameViewId);
+    if (currentIndex === -1) return;
+    
+    const swipeThreshold = 50;
+    const diff = touchStartX - touchEndX;
+    
+    if (Math.abs(diff) > swipeThreshold) {
+      if (diff > 0 && currentIndex < gameIdsList.length - 1) {
+        // Swipe left - next game
+        showGameView(gameIdsList[currentIndex + 1]);
+      } else if (diff < 0 && currentIndex > 0) {
+        // Swipe right - previous game
+        showGameView(gameIdsList[currentIndex - 1]);
+      }
+    }
+  }
+
+  function loadGameResults() {
+    document.getElementById('games-loading').style.display = 'block';
+    document.getElementById('games-table').style.display = 'none';
+    document.getElementById('games-record').style.display = 'none';
+    
+    google.script.run
+      .withSuccessHandler(data => {
+        const record = data.record || {w: 0, l: 0, t: 0, ot: 0, so: 0};
+        const games = data.games || [];
+        
+        // Display record
+        const recordText = `Record: ${record.w} - ${record.l} - ${record.t}${record.ot > 0 ? ' - ' + record.ot + ' OT Loss' : ''}${record.so > 0 ? ' - ' + record.so + ' SO Loss' : ''}`;
+        document.getElementById('games-record').textContent = recordText;
+        document.getElementById('games-record').style.display = 'block';
+        
+        // Display games table
+        const tbody = document.getElementById('games-body');
+        tbody.innerHTML = '';
+        
+        if (games.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3">No games yet</td></tr>';
+        } else {
+          games.forEach(game => {
+            const tr = document.createElement('tr');
+            let resultClass = '';
+            if (game.result.includes('Win')) resultClass = 'win';
+            else if (game.result.includes('Loss')) resultClass = 'loss';
+            else if (game.result === 'Tie') resultClass = 'tie';
+            
+            tr.innerHTML = `
+              <td>${game.opponent}</td>
+              <td class="score" onclick="showGameView(${game.gameDetId})">${game.score}</td>
+              <td class="${resultClass}">${game.result}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+        
+        document.getElementById('games-loading').style.display = 'none';
+        document.getElementById('games-table').style.display = 'table';
+      })
+      .getGameResults();
+    
+    // Load game IDs list for navigation
+    google.script.run
+      .withSuccessHandler(ids => {
+        gameIdsList = ids;
+      })
+      .getGameIdsList();
   }
 
   // Init — load player numbers from Roster sheet first
